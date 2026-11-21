@@ -2,6 +2,216 @@
 
 > 倒序排列，最新在最上。
 
+## 2.10.0（vc103）· 应用内检查更新与下载安装、关于页法律信息（2026-11-21）
+
+> 版本号：2.9.9 / vc102 → **2.10.0 / vc103**。
+> 首个开源发布版本：https://github.com/wy624333/openx
+
+### 新增
+- **应用内检查更新**：`update/UpdateChecker` 走 GitHub Releases API（`wy624333/openx`）。
+  `api.github.com` 国内常被拦截，故按 `API_HOSTS` 顺序逐个尝试官方与反代镜像；
+  版本号优先取更新说明里约定的 `versionCode: 103` 一行，缺失时按
+  `主*10000 + 次*100 + 修订` 折算，保证单调可比。
+- **应用内下载与安装**：下载按 `MIRROR_PREFIXES` 逐条回退（前缀 + 原始地址），
+  全失败才报错；落 `cacheDir/update/`，带进度回调，界面显示百分比。
+  未授予「安装未知应用」时先引导去授权页，安装前经 `FileOpenHelper` 校验包名后缀。
+- **关于页法律信息**：新增「用户协议」「隐私政策」「开源许可」三个条目，
+  文档在 `assets/legal/`，由 `DocScreen` 复用 `MarkdownContent` 渲染，离线可读。
+  刻意不放 `assets/docs/`——那是 AI 记忆参考文档目录，会被 `seedBuiltinDocs()`
+  释放给模型检索，用户协议这类文档不该进参考资料库。
+- **意见反馈**：关于页新增入口，跳 GitHub Issues。
+- **恢复内置设备监控插件**（`openx.device-monitor` v1.1.1）：CPU 频率负载、内存、
+  存储、电池温度与运行时长，支持浮窗常驻；随 `BuiltinPluginInstaller` 释放到 `.openx/plugins/`。
+
+### 改进
+- **关于页版本行改为可点**：查询最新版本，有新版本再次点击即在应用内下载并拉起安装器。
+  状态依次显示 `vX (vcN)` → `检查中…` → `已是最新` / `vX 可更新` / `下载中 N%` / `检查失败，重试`。
+- **各管理页说明收进顶栏 ⓘ 弹窗**：`ManageCommonUi` 新增 `GuideDialog`（小标题 + 正文分段，可滚动），
+  `ManageTopBar` 增加 `onGuide` 参数，标题补 `maxLines=1` + 省略号。
+  插件 / MCP / 记忆 / 技能 / 工作流管理页、远程连接页、设置页（子代理 / 工具 / 运行环境）
+  底部大段说明文字全部上移，页面正文不再被一屏小字淹没。
+- `AgentConsoleScreen` 顶栏标题与副标题改为可横滑看全文，切会话回到开头。
+
+### 修复
+- **复制消息时剔除 AI 思考内容**：AI 回复复制经 `ChatUtils.removeThinkingContent`
+  过滤思考段；气泡复制按钮改用正文原文 `bodyContentRaw`。
+- **远程连接与文件浏览面板紧急修复**：`RemoteConnectionBrowser` 重写（剪贴板复制/剪切/粘贴、
+  新建文件夹、重命名、删除、属性查看、路径自动定位）；`RemoteSshClient` / `RemoteManager` /
+  `RemoteFileBridge` / `RemoteFtpClient` / `RemoteModels` 修复；
+  `RemoteServerEditDialog` 密码与私钥路径状态分离。
+
+### 其他
+- 移除关于页的「构建时间」显示（每次构建都变，对用户无意义）。
+- 新增 `RemoteTrafficMonitorTest`；`PluginAutomationBridge` 新增 `cpu.freqMax`
+  （各核 `scaling_max_freq` / `cpuinfo_max_freq` 最大值，kHz），
+  并注明 `cpu.usage` 在 Android 8.0+ 恒为 -1（SELinux proc_stat 限制），
+  负载比例改用 freqs 均值 / freqMax。
+
+## 2.9.9（vc102）· 插件浮窗与声明式配置、Git 凭据管理、SAF 文件开放（2026-11-19）
+
+> 版本号：2.9.8 / vc101 → **2.9.9 / vc102**。
+
+### 新增
+- **插件浮窗（桌面宠物）**：`PluginOverlayWindow` 重写，支持 `chrome`（标题栏）/
+  `transparent` / `dragAnywhere` / `rememberPosition`，几何与可见状态落盘；
+  UI 轨道与后台脚本轨道共用同一窗口实例（`obtain` 按插件 id 共享），
+  避免「面板已开浮窗、后台任务以为没开又拉一个」。
+  新增 `overlayAutoStart` 清单字段：App 启动时按上次退出状态恢复浮窗（后台线程 + 延迟拉起，
+  建窗要等 ComposeView 就绪，不能阻塞启动）；管理页加「自启」开关。
+  后台脚本也能拉浮窗：服务轨道新增 `openxOverlayShow` / `MoveTo` / `Geometry` /
+  `SetPassThrough` / `IsShowing` / `CanShow`。新增独立气泡窗口——浮窗本体常只有几十 dp
+  摆不下字，气泡单独开窗且不接收触摸。
+- **Canvas 绘制**：新增 `UiRendererCanvas`，插件可用绘制指令画自定义图形（线条/路径/圆角/文字）。
+  图片支持 `asset://` 前缀读插件包内资源，加 `LruCache`，key 带 `assetDir`
+  避免不同插件同名资源互相顶掉。
+- **帧序列与节点动画**：`frames` 由宿主一次性预解码，定时器只切 index（下限 80ms）——
+  若让插件用 `setInterval` 改 src，每帧都要重新读盘 + 解码，画面会闪。
+  `nodeAnimate` 支持 `bob` / `tilt` / `breathe` 三种无限循环，作用于绘制变换而非布局尺寸；
+  绘制变换新增 `alpha` / `rotate` / `scale` / `scaleX` / `scaleY` / `offsetX` / `offsetY`
+  （以前插件想做呼吸只能改 width/height，那会真的改变布局把旁边控件顶开）。
+- **浮窗贴边与气泡跟随**：窗口加 `FLAG_LAYOUT_NO_LIMITS`——没有它系统会把窗口夹回屏内，
+  负坐标移出屏幕完全不生效。`moveTo` 越界加上限：最多 80% 移出屏幕、至少留 20% 可见，
+  否则窗口会被拖丢。气泡是独立窗口，坐标不会自己跟着主窗口变，
+  抽出 `positionBubble` / `followBubble` 在 `moveTo` 与拖动回调里都跟着走。
+- **插件读 AI 会话状态**（`ctx.host.session`）：新增 `HostSessionState`，给插件看的
+  **聚合状态快照**——忙闲、是否思考中、正在跑的工具名、待确认类型、上下文 token 用量、
+  是否在重连。刻意只放状态不放内容：拿不到对话正文、思考正文、工具参数。
+  提供者由 `MainViewModel` 在 `init` 里注册，而不是把 ViewModel 传进插件桥——
+  插件桥活在插件 JS 生命周期里，与 ViewModel 没有父子关系。
+- **插件声明式配置页**：`PluginManifest` 新增 `settings`（可空），宿主把清单里的
+  settings 渲染成原生控件（`switch` / `segment` / `slider` / `text` / `number`，
+  认不出的类型按 text），按 group 分组；值写进插件 env，插件侧 `ctx.getEnv(key)` 读。
+  只补缺失的默认值、已有值一律不动——用户改过的配置不能被插件升级/重装冲掉。
+  新增 `PluginEnvStore` 收口 env 文件路径：UI 面板桥、服务桥、插件配置页三处必须共用同一份文件。
+- **插件详情分「管理 / 配置」两页**：管理页只读（ID/版本/目录/权限/诊断），
+  配置页能动手（服务状态与启停、刷新状态、settings 控件、定时任务）。
+  切页条走 `ManageDetailDialog` 新增的 `subHeader` 槽位，放在滚动区外不跟内容滚走。
+  新增「刷新状态」：容器的常驻进程可能是从插件面板里起的，宿主没有运行记录，
+  只读自身记录会一直显示未启动，所以再按声明地址探一次回环端口。
+- **服务脚本 `ctx.exec`**（需 filesystem 权限）：后台脚本可在容器里执行命令，
+  用于管理容器里的常驻进程（JVM / Node 网关等）——这类插件的后台不在宿主进程里，
+  以前只能先打开面板手动拉起来。同步模型，默认 20s / 上限 45s。
+- **插件服务启动过程可见**：启动时置「正在启动…」并禁用按钮，避免重复点击；
+  `onStart` 抛错不再只记日志，错误信息回传宿主并显示在配置页。
+- **Git 凭据管理、仓库切换与克隆**：凭据与署名独立页（底部双 tab），署名写
+  `user.name` / `user.email` 与 `remote.origin.url`；凭据按主机管理，token 打码显示。
+  自定义 credential helper 脚本（`assets/openx/git-credential-openx`）：
+  凭据文件 base64 + 反转存储，helper 解码后按 host 精确命中喂给 git。
+  文件 IPC 弹窗：helper 未命中时写 `cred-req-<id>`，App 轮询捕获后弹窗回填，
+  响应写回后 git 自动续跑；Git 页 / AI Bash / 交互终端三端共用。
+  顶栏仓库切换器扫描工作区根与一层子目录；克隆远程仓库支持自定义目录名，
+  失败自动清理半截目录。修复老容器不重跑 `provision.sh` 导致 credential 配置永不生效
+  （App 启动时幂等写 `gitconfig.credential` 并补 `includeIf`）。
+- **通过 SAF 开放 OpenX 文件**：`OpenXDocumentsProvider` 把私有目录（工作区 / 插件与记忆 /
+  容器根）暴露给系统文件管理器。
+
+### 新权限
+- `SESSION`（wireName=`session`，不危险）：插件读 AI 会话聚合状态。
+
+### 修复
+- **插件供应商在用户改设置后被当成手填条目重建、模型列表丢失**：
+  `syncPluginProviders` 原先按 `source == plugin` 认定「插件建的那条」，
+  但用户在供应商编辑器里拉取模型 / 改 key 都会触发保存，
+  而 `ProviderEditorScreen` 组装 config 时漏了 `source` / `pluginId`，保存后 source 被重置回 user。
+  下次插件刷新时认不出自己建的那条，走「新建」分支把用户拉取的模型覆盖成空。
+  两处一起修：编辑器组装 config 时带上 `initialProvider` 的 source / pluginId；
+  `syncPluginProviders` 改用 id 前缀（`plugin:`）认定插件条目。
+- **停用插件时连带停掉它的服务**：否则关掉开关后端口还占着、定时任务照跑，
+  而工具与钩子已经撤掉。
+- **插件声明的供应商改为随启用状态置灰而不是删除**：用户填的 key、拉取的模型不白丢。
+- `hasBackground` 不再要求 `SERVER` 权限：`service` 脚本只是 `ctx.exec` 管容器进程的插件
+  以前不被当成后台插件，配置页里显得什么都没有。
+
+### 其他
+- 移除内置设备监控插件（后续 2.10.0 恢复）。
+- 移除与凭据页重复的 `GitConfigDialog`。
+- 新增 `UiRangeSafetyTest` 覆盖绘制参数越界。
+
+## 2.9.8（vc101）· 插件声明 AI 供应商、DeepSeek Harness、运行环境 JDK（2026-11-16）
+
+> 版本号：2.9.7 / vc100 → **2.9.8 / vc101**。
+
+### 新增
+- **插件声明 AI 供应商**：`PluginManifest` 新增 `aiProvider`（可空——Gson 不套用 Kotlin
+  默认值，声明成非空会让 `copy` 直接 NPE）；插件启用时登记进 API 配置，禁用/卸载连带移除。
+  供应商表加 `source` / `pluginId` 区分「用户手填」与「插件声明」，DB 20 → 21 迁移，
+  已有行默认 user。插件来源的条目在列表里打「插件」标记，编辑页说明地址会被清单覆盖
+  （否则用户改完下次插件一启动又被覆盖，以为是没生效）。
+- **内置 DeepSeek Harness 插件**（`com.operit.sidebar_deepseek_harness`，13 个文件）：
+  走 `BuiltinPluginInstaller`，比对 `plugin.json` 的 version 与 `.installed`，
+  版本变了才覆盖，用户改过的配置不会被启动冲掉。
+- **运行环境新增 DeepSeek Harness（dsh）**：`RuntimeToolDef` 取代原先的 `Triple`
+  （多为 npm/apk 包名与是否可卸载），新增 dsh 项排在 OpenCode 后。
+  检测路径修正：插件把 dsh 装在 `/root/sidebar_deepseek_harness/node_modules/.bin/dsh`，
+  **不是全局安装**（dsh 不在 PATH），改为先查插件目录、再回退全局。
+  安装也装到插件同一目录（`pnpm add --prod`），避免设置页与插件各装一份互不相认；
+  装前校验 Node ≥ 24，apt 容器缺 cc 时先装 `build-essential`
+  （node-pty 无 Android arm64 预编译包，必须现场编译），超时 30 分钟。
+- **运行环境新增 JDK 17（headless）**检测/安装/卸载：`java -version` 走 stderr 故带 `2>&1`
+  并抽出引号里的版本号；装完仅在缺失时补 `/usr/lib/jvm/default-java` 软链
+  （镜像自带时不能改指，否则等于把用户的默认 JDK 降版）。
+- **运行环境「可更新」提示**：检测时顺带问上游 npm 源要 latest，有新版就在行上提示；
+  并发查询、8 秒超时，查不到就当没有更新。版本比较按 semver，
+  主体相同时比预发布段（dsh 上游发的是 `0.2.2-rc.1` 这种）。
+- **卸载入口**：已安装且可卸载的工具并排显示「卸载」+「重装」，卸载中显示转圈。
+  `RuntimeToolState` 增加 `uninstallable` 字段——UI 原先只判断 `version != null`，
+  导致 Node.js/npm/Corepack 也出现卸载按钮（它们是官方二进制手 cp 进 `/usr/bin` 的，
+  删了会连带弄坏 pnpm/opencode/dsh 的入口，容器重建才彻底）。卸载前必须弹窗确认。
+  卸完重新探测版本判定成败，不信退出码（`npm uninstall` 对不存在的包也返回 0）。
+- **插件快捷入口可点**：插件管理页详情里的快捷入口由纯文本改为可点条目，
+  点击执行（打开界面 / 填入提示词 / 用浏览器打开网址）；`openUrl` 类型新增 `OpenInNew` 图标。
+  `PluginQuickAction` 字段可空化 + `orEmpty` 兜底：同 aiProvider，清单缺字段时 Gson 给 null，
+  原先直接读 label/icon 会 NPE。
+- **插件页侧边栏入口**：顶栏 ≡ 打开侧边栏，新增 `AppSidebarContent`，
+  复用聊天页那套侧边栏内容（会话历史 / 文件树 / 插件快捷区 / 底部入口）。
+  抽屉只在打开时启用手势，避免与插件页自身的滚动/横向手势互抢，同时保住点遮罩关闭。
+- **浏览器收藏夹**：顶栏刷新左边加星标（空心=未收藏、实心=已收藏），
+  菜单「浏览器设置与工具」加「收藏夹」入口，可跳转与删除。
+  收藏存独立的 SharedPreferences 文件（与 UA/夜间模式那些设置分开，清设置不会连带清收藏）；
+  url 归一去掉尾部斜杠，避免同一页重复收藏。
+- **供应商模型测试可停止**：`ModelApiService` 改用 `enqueue` + `await` 把协程取消接到
+  `Call.cancel` 上（原先阻塞在 readTimeout 300s 的请求根本停不下来）；
+  新增单个模型停止按钮与任务表；拉取模型弹窗每行支持就地测试。
+
+### 修复
+- **插件 WebView 长按选不中**：`UiRendererWebView` 的 `AndroidView.update` 原先每帧都跑
+  `settings.applyTo(web)`，`WebSettings` 的 setter（textZoom / useWideViewPort）会触发
+  WebView 重新布局，把用户长按选中的文字清掉，表现为选择手柄闪一下就消失。
+  改为记住上次已应用的设置，只在真正变化时才 apply。
+- **视口兜底强改布局导致页面滑不动**：`VIEWPORT_FALLBACK_JS` 原先无条件给 html/body 与
+  `#root` / `#app` 等容器设 `height:100%` + `overflow:hidden`，且用 `setTimeout` 反复刷：
+  对自带布局的网页是灾难，滚动容器被改成 `overflow:hidden` 后页面就滑不动了。
+  改为先判断页面是否已有自己的布局（文档内容超出视口、或容器有实际高度/内部内容），
+  有则一律不动；只对真正拿不到高度的 SPA 白屏做兜底。
+- **插件运行时兼容**：`PluginUiRuntime` 渲染前把 `ctx.UI` 挂到全局 `root.UI`——
+  operit 的 UI 脚本大量直接用全局 `UI.Text(...)`，不补这个全局对象，
+  脚本只在用到 `UI.xxx` 的分支抛 ReferenceError，表现成「渲染结果解析失败」。
+  `UiRenderContext` 增加 `renderEpoch`，`dispatched` 的 remember 带 key，
+  否则插件热重载后 `onLoad` 再也不派发。`PluginUiSession.settlePending` 改为
+  先试 UI 运行时的 pending 表、再试兼容层的（两张独立表，只调一个会漏）。
+- **长命令挂后台**：`CompatHostBridge` 新增 `hostScope` + `pendingSink`，
+  超时命令挂后台、立即返回 `pending:<id>`，QuickJS 线程释放后 `Screen()` 能重跑——
+  这是「装依赖时界面没反应」的解法。分段续跑只在超时时续跑（退出码非 null 说明真跑完了）；
+  总预算 20 分钟、累积输出 20 万字符上限。`exists` 对路径不可解析返回 `exists:false`
+  而非抛错（否则插件的 `if (!exists.exists)` 分支走不到，DSH 就是这样误判成已装好）。
+- **超长内容 OOM 防护**（真机崩溃：`Failed to allocate 1136 byte @ ChatUtils.doExtractThinkingContent`）：
+  `MainViewModel.clampToolResult` 对超过 20 万字符的工具结果保留头 3/4 + 尾 1/4——
+  原先 `onToolResult` 无任何上限，而 readFile 允许读 50MB 文件，一条转储就能顶穿堆。
+  `ChatUtils` 对超过 100 万字符的 content 直接当正文、不扫 think 标签
+  （命中标签时要建 `StringBuilder(content.length)` 副本，单次处理同时存在 2~3 份等长字符串，
+  崩溃现场正是这行）。
+- **附件添加去重**：协程里取 MIME / 查文件名都是挂起点，连续两次选同一文件能绕过入口检查，
+  留下两条同 URI 附件；附件条是 `LazyRow` 且拿 URI 当 key，重复 key 会直接 throw 崩掉。
+- **MemoryStore 释放内置文档改用内容指纹**（SHA-256）而不是只比版本号：
+  文档改动多数不伴随升版本号，只比版本号会让设备上的旧文档永远刷不新。
+- 插件管理页详情「打开界面」移到内容最顶部，原先压在权限清单后面要滚一屏才点到。
+
+### 其他
+- 补提交 2.9.7 遗漏的插件源码与测试文件（`PluginBus.kt` / `PluginFileOps.kt`），
+  上一笔只按显式路径 add，漏掉未跟踪的新文件导致编译直接失败。
+  教训：提交时除了 `git status` 的 M/D，必须同时看未跟踪的源码文件（`??` 里的 .kt）。
+- 新增 `PluginAiProviderTest` / `PluginQuickActionTest`，覆盖「Gson 不套默认值」这类 NPE 风险。
+
 ## 2.9.7（vc100）· 插件定时任务与消息总线、会话槽位内存回收（2026-11-14）
 
 > 版本号：2.9.6 / vc99 → **2.9.7 / vc100**。
