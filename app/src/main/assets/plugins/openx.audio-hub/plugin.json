@@ -1,0 +1,25 @@
+{
+  "id": "openx.audio-hub",
+  "name": "音频工作台",
+  "version": "1.4.7",
+  "description": "音频工作台：网络电台（radio-browser 数万台）+ 本地音乐库扫描 + 歌单。宿主内置播放，支持单曲/整单/随机播放与上下曲；界面为音乐电台风格，封面用稳定色块生成，不依赖网络图片。",
+  "author": "wy",
+  "main": "main.js",
+  "ui": "ui/panel.ui.js",
+  "apiVersion": "1.0.0",
+  "permissions": [
+    "toast",
+    "env",
+    "http",
+    "call_tool",
+    "clipboard",
+    "audio"
+  ],
+  "quickActions": [
+    {
+      "label": "打开音频工作台",
+      "action": "openUi",
+      "icon": "volumeup"
+    }
+  ]
+}

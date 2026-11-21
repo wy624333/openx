@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.18.1)
+project("termux")
+add_library(termux SHARED termux.c)
+target_compile_options(termux PRIVATE -std=c11 -Wall -Wextra -Werror -Os -fno-stack-protector)
+target_link_options(termux PRIVATE -Wl,--gc-sections)
+
+add_library(exec_wrapper SHARED exec_wrapper.c)
+set_target_properties(exec_wrapper PROPERTIES OUTPUT_NAME "exec-wrapper")
+target_compile_options(exec_wrapper PRIVATE -std=c11 -Wall -Wextra -Werror -Os -fno-stack-protector)
+target_link_options(exec_wrapper PRIVATE -Wl,--gc-sections)
+target_link_libraries(exec_wrapper dl)

@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">OpenX</string>
+    <string name="accessibility_service_description">允许 OpenX 自动化执行手机操作，包括截屏、模拟点击和滑动、获取屏幕内容等</string>
+    <string name="provider_brand_doubao">豆包</string>
+    <string name="provider_brand_zhipu">智谱</string>
+    <string name="provider_brand_hunyuan">混元</string>
+    <string name="provider_brand_siliconflow">硅基流动</string>
+    <string name="provider_model_icon">模型图标</string>
+    <string name="common_ai_providers">AI 供应商</string>
+    <string name="common_other">其他</string>
+</resources>

@@ -1,0 +1,14 @@
+{
+  "id": "wy.calculator",
+  "name": "计算器",
+  "version": "1.0.0",
+  "description": "四则运算计算器，也能直接粘贴整串表达式求值；支持括号、幂运算、科学计数、常用函数与常数。",
+  "author": "wy",
+  "main": "main.js",
+  "ui": "ui/panel.ui.js",
+  "apiVersion": "1.0.0",
+  "permissions": ["toast", "env"],
+  "quickActions": [
+    { "label": "打开计算器", "action": "openUi", "icon": "calculate" }
+  ]
+}

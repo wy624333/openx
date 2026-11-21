@@ -1,0 +1,5 @@
+包：com.operit.sidebar_deepseek_harness
+共 1 条：0 条会丢功能，1 条仅提示（可用工具 6 个）
+· METADATA 未识别键 1 个：兼容层不读这些键（不影响工具与界面）：deepseek_harness_control.category
+子包：
+· DeepSeek Harness 控制（deepseek_harness_control）6 个工具，默认启用

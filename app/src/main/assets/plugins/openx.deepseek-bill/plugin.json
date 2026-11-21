@@ -1,0 +1,14 @@
+{
+  "id": "openx.deepseek-bill",
+  "name": "DeepSeek 余额",
+  "version": "1.0.0",
+  "description": "在侧边栏 / quickActions 显示 DeepSeek API 账单余额。手动填入 API Key，调用官方 /user/balance 接口，展示可用总额、赠额、充值额与是否够用。",
+  "author": "wy",
+  "main": "main.js",
+  "ui": "ui/panel.ui.js",
+  "apiVersion": "1.0.0",
+  "permissions": ["http", "env", "toast", "clipboard"],
+  "quickActions": [
+    { "label": "查看余额", "action": "openUi", "icon": "account_balance" }
+  ]
+}

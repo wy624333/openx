@@ -1,0 +1,14 @@
+{
+  "id": "openx.plugin-finder",
+  "name": "插件发现器",
+  "version": "1.0.0",
+  "description": "跨生态发现插件灵感：聚合 DSH / Operit / OpenX 三个生态的可索引插件源，展示能力、star、许可与移植难度，一键下载到工作区并生成 OpenX 移植指引。下载物是参考素材，不会自动安装。",
+  "author": "wy",
+  "main": "main.js",
+  "ui": "ui/panel.ui.js",
+  "apiVersion": "1.0.0",
+  "permissions": ["toast", "env", "http", "call_tool"],
+  "quickActions": [
+    { "label": "打开插件发现器", "action": "openUi", "icon": "search" }
+  ]
+}

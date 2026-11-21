@@ -1,0 +1,17 @@
+{
+  "id": "openx.free-model-gateway",
+  "name": "免费模型网关",
+  "version": "1.0.0",
+  "description": "本地 OpenAI 兼容网关：免注册、免 API Key，提供 20+ 免费前沿模型（DeepSeek/GLM/Kimi/Nemotron 等）。在插件详情页点「启动服务」即可使用，将提供商 baseUrl 指向 127.0.0.1:18899 即可接入。",
+  "author": "OpenX",
+  "main": "main.js",
+  "ui": "ui/panel.ui.js",
+  "service": "service/gateway.js",
+  "port": 18899,
+  "apiVersion": "1.0.0",
+  "permissions": ["http", "env", "server", "toast", "notify", "clipboard"],
+  "quickActions": [
+    { "label": "打开网关面板", "action": "openUi", "icon": "router" },
+    { "label": "查看可用模型", "prompt": "请调用 freemodelgateway_list_models 工具，列出当前免费模型网关可用的模型。", "icon": "list", "autoSend": false }
+  ]
+}

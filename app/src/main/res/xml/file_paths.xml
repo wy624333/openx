@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 供「用其它应用打开文件」使用（ACTION_VIEW + FileProvider 授权 URI）。
+     侧边栏文件树点开文件时，APK 走系统安装器、其它类型走对应的外部应用，
+     都需要把宿主 File 转成 content:// URI 授权给目标应用。
+
+     覆盖范围与 BrowseFileSystem 能浏览到的宿主路径对应：
+     - files-path：filesDir 下的工作区（filesDir/workspace）、AI 配置目录（filesDir/openx）、
+       rootfs（filesDir/rootfs*）——文件树里绝大多数路径都落在这里。
+     - external-path：外部本地工作区（用户挂到 /storage 下的目录），以及文件树里
+       以宿主绝对路径直接列取的固定绑定（/sdcard 等）。
+     - cache-path：无法直接授权的文件会先拷到 cacheDir 再授权（见 FileOpenHelper）。
+
+     ⚠ 不要为了省事写成「全部路径」的宽松配置——FileProvider 的 path 决定
+     哪些目录可以被授权出去，多写一条就多一分越权暴露的风险。 -->
+<paths>
+    <files-path name="files" path="." />
+    <external-path name="external" path="." />
+    <cache-path name="cache" path="." />
+</paths>

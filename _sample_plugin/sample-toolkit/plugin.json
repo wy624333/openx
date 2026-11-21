@@ -1,0 +1,15 @@
+{
+  "id": "openx.sample-toolkit",
+  "name": "功能演示包",
+  "version": "1.0.0",
+  "description": "演示 OpenX 插件二期能力：交互组件（滑块/下拉/单选/标签页）、图片、文件与剪贴板、通知、结构化存储。可直接作为写自己插件的模板。",
+  "author": "OpenX",
+  "main": "main.js",
+  "ui": "ui/panel.ui.js",
+  "apiVersion": "1.0.0",
+  "permissions": ["toast", "env", "clipboard", "file", "notify"],
+  "quickActions": [
+    { "label": "打开演示面板", "action": "openUi", "icon": "extension" },
+    { "label": "能力清单", "prompt": "请调用 sampletoolkit_info 工具，说明这个演示插件覆盖了哪些能力。", "icon": "list", "autoSend": false }
+  ]
+}
