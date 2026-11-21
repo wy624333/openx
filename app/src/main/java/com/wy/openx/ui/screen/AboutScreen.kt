@@ -33,7 +33,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -49,26 +53,71 @@ import com.wy.openx.ui.theme.Border
 import com.wy.openx.ui.theme.PageBg
 import com.wy.openx.ui.theme.TextPrimary
 import com.wy.openx.ui.theme.TextSecondary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.util.concurrent.TimeUnit
 
 /**
  * 「关于 OpenX」子页（设置 → 关于 → 版本）。
  *
  * 取代原先的版本弹窗：弹窗里既有版本/构建时间，又塞了 13 条功能列表，纵向过长且
- * 关掉就看不到。改成独立子页后与「偏好设置 / 应用权限」保持同一套下钻交互，
- * 也方便以后放检查更新、仓库、许可证等入口,检查更新点击版本号查询，未做。
+ * 关掉就看不到。改成独立子页后与「偏好设置 / 应用权限」保持同一套下钻交互。
  *
- * 仓库/许可证暂为占位：用户计划后续上传 GitHub 再补地址，故留空常量，
- * 未填写时行尾显示「待发布 / 待补充」且不可点击，避免打开无效链接。
+ * 点版本号向 GitHub 查询远端 version.json，比较 versionCode 判断是否有新版；
+ * 有新版本时再点一下跳仓库主页手动下载。
  */
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val appIcon = remember { loadAppIconBitmap(context) }
+    val scope = rememberCoroutineScope()
     val buildDate = remember {
         runCatching {
             java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
                 .format(java.util.Date(BuildConfig.BUILD_TIME))
         }.getOrDefault("未知")
+    }
+
+    var checking by remember { mutableStateOf(false) }
+    var latest by remember { mutableStateOf<RemoteVersion?>(null) }
+    var failed by remember { mutableStateOf(false) }
+
+    val hasUpdate = latest?.let { it.versionCode > BuildConfig.VERSION_CODE } == true
+    val versionValue = when {
+        checking -> "检查中…"
+        hasUpdate -> "v${latest?.versionName} 可更新"
+        latest != null -> "已是最新"
+        failed -> "检查失败，重试"
+        else -> "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+    }
+
+    fun checkUpdate() {
+        if (checking) return
+        checking = true
+        failed = false
+        scope.launch {
+            val result = fetchRemoteVersion()
+            checking = false
+            if (result == null) {
+                failed = true
+                android.widget.Toast.makeText(context, "检查更新失败，请检查网络", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                latest = result
+                failed = false
+                if (result.versionCode > BuildConfig.VERSION_CODE) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "发现新版本 v${result.versionName}，点「打开」去下载",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    android.widget.Toast.makeText(context, "已是最新版本", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     Column(
@@ -131,7 +180,10 @@ fun AboutScreen(onBack: () -> Unit) {
             AboutRow(
                 icon = Icons.Outlined.Info,
                 title = "版本",
-                value = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+                value = versionValue,
+                onClick = {
+                    if (hasUpdate) openUrl(context, GITHUB_REPO_URL) else checkUpdate()
+                }
             )
             RowDivider()
             AboutRow(
@@ -145,19 +197,15 @@ fun AboutScreen(onBack: () -> Unit) {
             AboutRow(
                 icon = Icons.Outlined.Code,
                 title = "GitHub 仓库",
-                value = if (GITHUB_REPO_URL.isBlank()) "待发布" else "打开",
-                onClick = if (GITHUB_REPO_URL.isBlank()) null else {
-                    { openUrl(context, GITHUB_REPO_URL) }
-                }
+                value = "打开",
+                onClick = { openUrl(context, GITHUB_REPO_URL) }
             )
             RowDivider()
             AboutRow(
                 icon = Icons.Outlined.Description,
                 title = "开源许可证",
-                value = if (LICENSE_URL.isBlank()) "待补充" else "查看",
-                onClick = if (LICENSE_URL.isBlank()) null else {
-                    { openUrl(context, LICENSE_URL) }
-                }
+                value = "GPL-3.0",
+                onClick = { openUrl(context, LICENSE_URL) }
             )
 
             Spacer(Modifier.height(32.dp))
@@ -166,11 +214,47 @@ fun AboutScreen(onBack: () -> Unit) {
 }
 
 /**
- * TODO：上传 GitHub 后把下面两个常量填上真实地址即可启用对应入口，
- * 无需改 UI（为空时显示「待发布 / 待补充」并禁用点击）。
+ * 远端版本信息。version.json 由仓库同步脚本生成，放在仓库根目录。
  */
-private const val GITHUB_REPO_URL = ""
-private const val LICENSE_URL = ""
+private data class RemoteVersion(val versionCode: Int, val versionName: String)
+
+private const val GITHUB_REPO_URL = "https://github.com/wy624333/openx"
+private const val LICENSE_URL = "https://github.com/wy624333/openx/blob/main/LICENSE"
+
+/** 主源用 raw，回退 jsDelivr CDN（国内直连 raw 常被墙）。 */
+private val VERSION_URLS = listOf(
+    "https://raw.githubusercontent.com/wy624333/openx/main/version.json",
+    "https://cdn.jsdelivr.net/gh/wy624333/openx@main/version.json"
+)
+
+private val updateClient = OkHttpClient.Builder()
+    .connectTimeout(8, TimeUnit.SECONDS)
+    .readTimeout(8, TimeUnit.SECONDS)
+    .build()
+
+/** 依次尝试各个源，任一成功即返回；全失败返回 null。 */
+private suspend fun fetchRemoteVersion(): RemoteVersion? = withContext(Dispatchers.IO) {
+    for (url in VERSION_URLS) {
+        val parsed = runCatching {
+            val request = Request.Builder().url(url).build()
+            updateClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) null else parseVersionJson(response.body?.string())
+            }
+        }.getOrNull()
+        if (parsed != null) return@withContext parsed
+    }
+    null
+}
+
+private fun parseVersionJson(raw: String?): RemoteVersion? {
+    if (raw.isNullOrBlank()) return null
+    return runCatching {
+        val json = org.json.JSONObject(raw)
+        val code = json.optInt("versionCode", 0)
+        val name = json.optString("versionName", "")
+        if (code <= 0 || name.isBlank()) null else RemoteVersion(code, name)
+    }.getOrNull()
+}
 
 private const val ICON_SIZE_DP = 56
 
