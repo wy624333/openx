@@ -1,0 +1,27 @@
+{
+  "id": "openx.device-monitor",
+  "name": "设备监控",
+  "version": "1.1.1",
+  "description": "实时查看 CPU 频率负载、内存占用、存储、电池温度与运行时长，每 2 秒自动刷新，也可以浮在其它应用上常驻显示。",
+  "author": "wy",
+  "ui": "ui/panel.ui.js",
+  "apiVersion": "1.0.0",
+  "permissions": [
+    "system",
+    "overlay",
+    "toast"
+  ],
+  "theme": {
+    "primary": "#00BCD4",
+    "success": "#26A69A",
+    "warning": "#FFB300",
+    "error": "#FF5252"
+  },
+  "quickActions": [
+    {
+      "label": "打开设备监控",
+      "action": "openUi",
+      "icon": "showchart"
+    }
+  ]
+}

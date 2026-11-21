@@ -21,8 +21,8 @@ android {
         // 数据目录里的文件，PRoot 容器二进制将无法运行（同 Termux/AiCode 的取舍）。
         // 代价：不能上 Google Play，走内部分发。
         targetSdk = 28
-        versionCode = 102
-        versionName = "2.9.9"
+        versionCode = 103
+        versionName = "2.10.0"
         buildConfigField("Long", "BUILD_TIME", "${System.currentTimeMillis()}L")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
