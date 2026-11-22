@@ -504,6 +504,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         get() = slot().terminalConfirmDeferred
         set(v) { slot().terminalConfirmDeferred = v }
     private var toastJob: Job? = null
+
+    /** 更新包下载中，防重复点击。 */
+    private var updateDownloading = false
     private var nextMessageId = AtomicLong(System.currentTimeMillis() * 1000)
     // 终端目标不能跳会话乱跑（A 的命令不应跑到 B 的容器）。
     private var lastToolTargetId: String
@@ -521,6 +524,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val toolMessageIds = HashMap<String, Long>()
 
     var screen by mutableStateOf<AppScreen>(AppScreen.Console)
+        private set
+
+    /**
+     * 进入设置页时要直接打开的分区（`api` / `container` 等）。
+     * 首次启动引导里点「去配置」用它一步跳到目标分区，用完即清。
+     */
+    var settingsInitialSection by mutableStateOf<String?>(null)
         private set
 
     /**
@@ -2092,7 +2102,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             .sortedWith(compareBy({ if (it.seq == 0L) Long.MAX_VALUE else it.seq }, { it.id }))
     }
 
-    fun openSettings() { screen = AppScreen.Settings }
+    fun openSettings(section: String? = null) {
+        settingsInitialSection = section
+        screen = AppScreen.Settings
+    }
+
+    /** 设置页消费完初始分区后清除，避免下次从侧边栏进入时又跳回该分区。 */
+    fun consumeSettingsInitialSection() { settingsInitialSection = null }
     fun openConsole() { screen = AppScreen.Console }
     fun openTerminal() { screen = AppScreen.Terminal }
     fun openQuantTrade() { screen = AppScreen.QuantTrade }
@@ -2209,7 +2225,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 id = 0, title = "新会话 $time",
                 // 会话级模式下新会话**尚未选模型**：写全局模型会让会话列表里
                 // 立刻显示上一个会话的模型名，与顶栏的 [未选择模型] 自相矛盾。
-                meta = if (!uiState.settings.modelGlobalMode) "刚刚 · [未选择模型]"
+                // 同理，全局模式下若还没绑定任何提供商（全新安装），settings.model 只是
+                // 出厂默认值，不能当成已选模型写进会话列表。
+                meta = if (!uiState.settings.modelGlobalMode ||
+                    uiState.settings.selectedProviderId.isBlank()
+                ) "刚刚 · [未选择模型]"
                 else "刚刚 · ${uiState.settings.model}",
                 active = true,
                 // 新会话立即可见地排在前面；否则 lastActiveAt=0 会沉到所有聊过的会话之后
@@ -2255,8 +2275,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val now = System.currentTimeMillis()
             // 全局模式跟当前全局模型走，会话级模式才显示分叉源自己的选择（null = 未选择）
+            // 未绑定提供商时 settings.model 只是出厂默认值，不算已选。
             val modelLabel = if (uiState.settings.modelGlobalMode) {
-                uiState.settings.model
+                uiState.settings.model.takeIf { uiState.settings.selectedProviderId.isNotBlank() }
             } else {
                 source.model
             }
@@ -4524,12 +4545,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * 旧数据迁移：首次启动时若提供商表为空，把旧的扁平 settings（provider/baseUrl/apiKey/model）
      * 与 apiPresets 列表 seed 成 ai_providers 记录。
      * 只执行一次（表非空即跳过），保证用户升级后原配置不丢。
+     *
+     * **全新安装必须跳过**：AppSettings 的默认值本身就写着 SiliconFlow / Qwen/Qwen3.5-4B，
+     * 只按「表为空」判断的话，会把这两个默认值当成用户配置造出一条他从未创建过的提供商，
+     * 还因为 selectedProviderId 被解析成它而标上「当前」，看起来像软件自带了一个配置。
+     * 故另要求「有旧配置痕迹」：用户填过 Key，或改过地址/服务商/模型任意一项。
      */
     private suspend fun seedProvidersFromLegacy(settings: AppSettings) {
         if (aiProviderRepository.getAllProvidersOnce().isNotEmpty()) return
         // 直接读 Flow 首值（而非内存 uiState.apiPresets），避免 apiPresetsFlow 尚未发出时
         // 误判为空、漏掉用户已保存的多个预设。
         val existing: List<ApiPreset> = settingsStore.apiPresetsFlow.first()
+        if (existing.isEmpty() && !hasLegacyConfig(settings)) return
         val presets: List<ApiPreset> = if (existing.isNotEmpty()) existing else {
             listOf(
                 ApiPreset(
@@ -4555,6 +4582,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (seeded.isNotEmpty()) {
             seeded.forEach { aiProviderRepository.saveProvider(it) }
         }
+    }
+
+    /** 扁平 settings 里是否留下了用户配置过的痕迹（与默认值逐项对比）。 */
+    private fun hasLegacyConfig(settings: AppSettings): Boolean {
+        val defaults = AppSettings()
+        return settings.apiKey.isNotBlank() ||
+            settings.baseUrl != defaults.baseUrl ||
+            settings.provider != defaults.provider ||
+            settings.model != defaults.model
     }
 
     // ===== 模式切换 / 项目工作区（聊天页输入框旁的模式与项目按钮） =====
@@ -5641,6 +5677,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     showToast("导出失败")
                 }
+            }
+        }
+    }
+
+    /**
+     * 弹窗里点「立即更新」后的下载与安装。
+     *
+     * 与关于页里那条路径共用 [UpdateChecker]，区别只在于这里不在页内展示进度，
+     * 改用 Toast 告知开始与结果——用户可能正在任何页面，没有进度条可挂。
+     */
+    fun downloadAndInstall(release: com.wy.openx.update.UpdateChecker.Release) {
+        if (updateDownloading) return
+        if (!com.wy.openx.update.UpdateChecker.canInstall(appContext)) {
+            showToast("请先允许本应用安装未知应用")
+            com.wy.openx.update.UpdateChecker.requestInstallPermission(appContext)
+            return
+        }
+        updateDownloading = true
+        showToast("开始下载 v${release.versionName}…")
+        viewModelScope.launch {
+            val apk = com.wy.openx.update.UpdateChecker.download(appContext, release) { _, _ -> }
+            updateDownloading = false
+            if (apk == null) {
+                showToast("下载失败，请检查网络后重试")
+            } else {
+                com.wy.openx.update.UpdateChecker.install(appContext, apk)
             }
         }
     }

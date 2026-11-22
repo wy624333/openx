@@ -93,10 +93,11 @@ class SettingsStore(private val context: Context) {
             // 语义翻转迁移：本字段原为 model_session_mode（默认 false=全局）。
             // 新键没有时读旧键并**取反**，这样所有老用户的实际行为都不变：
             //   旧 true（会话级）→ 新 false（会话级）；旧 false（全局）→ 新 true（全局）。
-            // 两者都没有（全新安装）→ 默认 true（全局，与旧默认行为一致）。
+            // 两者都没有（全新安装）→ 默认 false（会话级）：新会话一律「未选择模型」，
+            // 不让出厂默认模型名冒充用户已选（与 AppSettings.modelGlobalMode 保持一致）。
             modelGlobalMode = prefs[Keys.modelGlobalMode]
                 ?: prefs[Keys.modelSessionMode]?.let { !it }
-                ?: true,
+                ?: false,
             autoArchiveDays = prefs[Keys.autoArchiveDays] ?: 0,
             restoreLastConversation = prefs[Keys.restoreLastConversation] ?: true,
             separateSendButton = prefs[Keys.separateSendButton] ?: false,

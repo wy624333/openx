@@ -1059,7 +1059,14 @@ fun AgentConsoleScreen(
                 // 【新会话默认不选模型】会话级模式下 effectiveModel 为空 = 本会话还没选模型
                 // （SessionSlot 不再把空 override 回落成全局模型）。这里如实显示占位文案，
                 // 而不是拿全局那家来填——那正是「串台」的另一种表现。
-                subtitle = "${uiState.effectiveModel.ifBlank { "[未选择模型]" }} · $modeLabel" +
+                //
+                // 全新安装时 effectiveProviderId 为空（没绑定任何提供商），但全局模式下
+                // effectiveModel 会拿到 AppSettings.model 的出厂默认值，直接显示就成了
+                // 「刚装完就选好了模型」。故先判提供商绑定，未绑定一律显示未选择。
+                subtitle = "${
+                    if (uiState.effectiveProviderId.isBlank()) "[未选择模型]"
+                    else uiState.effectiveModel.ifBlank { "[未选择模型]" }
+                } · $modeLabel" +
                     // 会话级模式下本会话已选定模型时标一下，否则用户会以为看到的是全局值。
                     (if (uiState.effectiveModel.isNotBlank() &&
                             (uiState.effectiveProviderId != uiState.settings.selectedProviderId ||

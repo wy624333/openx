@@ -312,6 +312,9 @@ fun SettingsScreen(
     onSaveCustomModelMetadata: (String, String, com.wy.openx.data.model.ModelMetadata) -> Unit = { _, _, _ -> },
     onRemoveCustomModelMetadata: (String, String) -> Unit = { _, _ -> },
     onLoadCustomModelMetadata: () -> Unit = {},
+    /** 进页时直接打开的分区（首次启动引导的「去配置」用），消费后回调 [onInitialSectionConsumed]。 */
+    initialSection: String? = null,
+    onInitialSectionConsumed: () -> Unit = {},
 ) {
     var baseUrl by remember { mutableStateOf(settings.baseUrl) }
     var apiKey by remember { mutableStateOf(settings.apiKey) }
@@ -850,8 +853,15 @@ fun SettingsScreen(
     // `if (openSection == "x")` 守卫一行都不用改。
     // 用不可变 List（而非 mutableStateListOf）承载栈，好处是导航逻辑能整体抽到
     // 纯函数 SectionNav 里——于是单测跑的就是这里真正执行的代码，不是它的副本。
-    var sectionStack by remember { mutableStateOf<List<String>>(emptyList()) }
+    var sectionStack by remember {
+        mutableStateOf(if (initialSection.isNullOrBlank()) emptyList() else listOf(initialSection))
+    }
     val openSection = SectionNav.current(sectionStack)
+
+    // 初始分区只能生效一次：不清掉的话，用户退出分区再进设置页又会跳回去。
+    LaunchedEffect(initialSection) {
+        if (!initialSection.isNullOrBlank()) onInitialSectionConsumed()
+    }
 
     // 进入分区，一律压栈：主页入口那 10 个是空栈→1 层，与原来的赋值等价；
     // 嵌套入口（镜像下载）则正确记住上一级。
@@ -1691,7 +1701,7 @@ fun SettingsScreen(
                     // 与另两个开关方向相反，用户反馈反直觉，已翻转语义并改名 modelGlobalMode。
                     SettingsToggleRow(
                         "模型选择模式",
-                        "开（默认）：聊天页切模型改全局当前模型；关：只改当前会话（其他会话不受影响，重启后仍记住）",
+                        "开：聊天页切模型改全局并统一所有会话；关（默认）：聊天页切模型只改当前会话",
                         modelGlobalMode
                     ) { modelGlobalMode = it }
                     SettingsCardDivider()
@@ -4041,7 +4051,7 @@ private fun AppearancePreview(
                 // 与去卡片底板后的真实设置页一致：行直接铺在背景上，无面板底。
                 PreviewSettingRow("主题", "浅米 · 系统默认", Icons.Outlined.Palette)
                 Box(Modifier.fillMaxWidth().padding(start = 28.dp).height(0.5.dp).background(Border.copy(alpha = 0.5f)))
-                PreviewSettingRow("模型选择模式", "开：改全局当前模型", Icons.Outlined.Tune)
+                PreviewSettingRow("模型选择模式", "关（默认）：只改当前会话", Icons.Outlined.Tune)
             }
         }
         if (hasImage) {

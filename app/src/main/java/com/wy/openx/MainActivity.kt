@@ -101,6 +101,17 @@ class MainActivity : ComponentActivity() {
             val vm: MainViewModel = viewModel()
             val chatScrollState = remember { com.wy.openx.ui.screen.ChatScrollState() }
             var showCommandPalette by remember { mutableStateOf(false) }
+            var showOnboarding by remember {
+                mutableStateOf(!com.wy.openx.ui.screen.OnboardingStore.isDone(this@MainActivity))
+            }
+            var updateNotice by remember {
+                mutableStateOf<com.wy.openx.update.UpdateChecker.Release?>(null)
+            }
+            // 每日一次检查更新：启动后延迟几秒，不与首屏渲染、插件扫描抢资源
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                kotlinx.coroutines.delay(3000)
+                updateNotice = com.wy.openx.update.UpdateScheduler.checkIfDue(this@MainActivity)
+            }
             androidx.compose.runtime.LaunchedEffect(Unit) {
                 if (hiddenBrowserHost.parent == null) {
                     findViewById<android.view.ViewGroup>(android.R.id.content)?.addView(hiddenBrowserHost)
@@ -301,6 +312,42 @@ onToggleTasksExpanded = { vm.toggleTasksExpanded() },
                 }
                 // 全局 Git 凭据弹窗：容器内任何 git 命令缺凭据都经 helper 文件 IPC 触发，三端共用
                 com.wy.openx.ui.screen.GitCredentialPromptDialog()
+
+                // 首次启动引导：本机只弹一次，介绍软件并提醒先配好 API 与容器环境
+                if (showOnboarding) {
+                    com.wy.openx.ui.screen.OnboardingDialog(
+                        onConfigureApi = {
+                            showOnboarding = false
+                            com.wy.openx.ui.screen.OnboardingStore.markDone(this@MainActivity)
+                            vm.openSettings("api")
+                        },
+                        onConfigureContainer = {
+                            showOnboarding = false
+                            com.wy.openx.ui.screen.OnboardingStore.markDone(this@MainActivity)
+                            vm.openSettings("container")
+                        },
+                        onDismiss = {
+                            showOnboarding = false
+                            com.wy.openx.ui.screen.OnboardingStore.markDone(this@MainActivity)
+                        }
+                    )
+                }
+
+                // 每日检查更新：启动后自动查一次，有新版且用户未跳过则弹窗提醒
+                if (updateNotice != null) {
+                    com.wy.openx.ui.screen.UpdateAvailableDialog(
+                        release = updateNotice!!,
+                        onUpdateNow = { target ->
+                            updateNotice = null
+                            vm.downloadAndInstall(target)
+                        },
+                        onSkipVersion = { code ->
+                            updateNotice = null
+                            com.wy.openx.update.UpdateScheduler.skipVersion(this@MainActivity, code)
+                        },
+                        onDismiss = { updateNotice = null }
+                    )
+                }
                 }
 
                 // 备份恢复进行中：全屏遮罩，防止用户切走/返回键退出导致恢复中断。
@@ -516,7 +563,9 @@ private fun AppPageHost(vm: MainViewModel, page: AppScreen, exitApp: () -> Unit)
                             onResolveProviderMetadata = { id, type, models -> vm.resolveModelMetadata(id, type, models) },
                             onSaveCustomModelMetadata = { id, m, meta -> vm.saveCustomModelMetadata(id, m, meta) },
                             onRemoveCustomModelMetadata = { id, m -> vm.removeCustomModelMetadata(id, m) },
-                            onLoadCustomModelMetadata = { vm.loadCustomModelMetadata() }
+                            onLoadCustomModelMetadata = { vm.loadCustomModelMetadata() },
+                            initialSection = vm.settingsInitialSection,
+                            onInitialSectionConsumed = { vm.consumeSettingsInitialSection() }
                         )
                     }
                     AppScreen.QuantTrade -> {

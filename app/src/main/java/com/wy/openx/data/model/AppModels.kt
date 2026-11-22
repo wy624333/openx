@@ -386,17 +386,22 @@ data class AppSettings(
     val reasoningEffortGlobalMode: Boolean = false,
 
     /**
-     * 模型选择的「全局设置模式」开关（**默认开**）。与上面两个开关**方向一致**：
-     * **开（默认）= 全局模式**，聊天页切模型改全局当前提供商；
-     * **关 = 会话级模式**，聊天页切模型只改当前会话（写入会话的 providerId/model 并持久化），
+     * 模型选择的「全局设置模式」开关（**默认关**）。与上面两个开关**方向一致**：
+     * **开 = 全局模式**，聊天页切模型改全局当前提供商；
+     * **关（默认）= 会话级模式**，聊天页切模型只改当前会话（写入会话的 providerId/model 并持久化），
      * 不影响其他会话；新会话默认「未选择模型」，需用户自己选。
+     *
+     * 默认值从 true 改为 false（用户 2026-11-22 要求）：全局模式下全新安装会直接沿用
+     * [model] 的出厂默认值，聊天页顶栏一开就显示一个用户从未选过的模型名；
+     * 默认会话级后新会话一律「未选择模型」，更符合「自己选」的预期。
+     * 已有用户的已存值不受影响（见 SettingsStore 的读取顺序）。
      *
      * 历史沿革：本字段原为 `modelSessionMode`（默认 `false`，且方向与另两个开关**相反**）。
      * 用户反馈「开=全局、关=会话级」才符合直觉（与 toolPermissionGlobalMode /
      * reasoningEffortGlobalMode 一致），故翻转语义并改名为 …GlobalMode。
      * 旧 DataStore 里的 `model_session_mode` 键在读取时按**取反**迁移（见 SettingsStore）。
      */
-    val modelGlobalMode: Boolean = true,
+    val modelGlobalMode: Boolean = false,
 
     /**
      * 自动归档天数（偏好设置）：**0 = 关闭**（默认）。

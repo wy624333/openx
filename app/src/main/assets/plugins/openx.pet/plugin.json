@@ -1,0 +1,123 @@
+{
+  "id": "openx.pet",
+  "name": "桌面宠物",
+  "version": "2.2.11",
+  "apiVersion": "1.0.0",
+  "author": "OpenX",
+  "description": "DeepSeek 吉祥物桌宠：真立绘切换表情，说话时头顶冒气泡（气泡窗口不挡操作）。会呼吸、浮动、自己沿屏幕走动、走到边上紧贴屏幕边缘。能跟着 AI 会话状态变脸（思考/干活/等你确认/上下文吃满/出错）。打开 App 时自动回到桌面（可在插件配置页关掉）。体型可小到 4dp。收回请在插件面板里点。",
+  "main": "main.js",
+  "ui": "ui/pet.ui.js",
+  "service": "service/pet.js",
+  "permissions": [
+    "overlay",
+    "env",
+    "notify",
+    "schedule",
+    "session"
+  ],
+  "quickActions": [
+    {
+      "label": "桌面宠物",
+      "action": "openUi",
+      "icon": "pets"
+    }
+  ],
+  "overlayAutoStart": true,
+  "schedule": [
+    {
+      "id": "keep-alive",
+      "every": "15m",
+      "desc": "宠物掉线时把它拉回桌面"
+    }
+  ],
+  "settings": [
+    {
+      "key": "pet_name",
+      "type": "text",
+      "title": "名字",
+      "default": "小鲸",
+      "placeholder": "给它起个名字",
+      "group": "外观"
+    },
+    {
+      "key": "pet_size",
+      "type": "slider",
+      "title": "体型",
+      "min": 4,
+      "max": 320,
+      "default": "200",
+      "group": "外观",
+      "desc": "桌面上的立绘大小（dp），最小 4dp（几乎只留一个小点）"
+    },
+    {
+      "key": "pet_rotate",
+      "type": "slider",
+      "title": "待机换表情间隔",
+      "min": 8,
+      "max": 90,
+      "default": "24",
+      "unit": "秒",
+      "group": "外观",
+      "desc": "没有互动时按累计时间稳定轮换，不会随机乱跳"
+    },
+    {
+      "key": "pet_talk",
+      "type": "switch",
+      "title": "会说话",
+      "default": "true",
+      "group": "性格",
+      "desc": "关掉就只做动作、不冒气泡"
+    },
+    {
+      "key": "pet_greet",
+      "type": "switch",
+      "title": "按时段问候",
+      "default": "true",
+      "group": "性格",
+      "desc": "早上/中午/下午/晚上的问候语"
+    },
+    {
+      "key": "pet_idle_min",
+      "type": "slider",
+      "title": "多久算没人理",
+      "min": 2,
+      "max": 60,
+      "default": "10",
+      "unit": "分钟",
+      "group": "性格",
+      "desc": "超过这个时间没互动会开始饿、犯困、睡着"
+    },
+    {
+      "key": "pet_walk",
+      "type": "switch",
+      "title": "在桌面上走动",
+      "default": "true",
+      "group": "行为",
+      "desc": "过一会儿自己沿屏幕走一段，到边上会停住"
+    },
+    {
+      "key": "pet_tuck",
+      "type": "switch",
+      "title": "贴边时收进去",
+      "default": "false",
+      "group": "行为",
+      "desc": "贴到屏幕边后缩进去只露一部分（默认不缩，只贴边）"
+    },
+    {
+      "key": "pet_session",
+      "type": "switch",
+      "title": "跟着 AI 状态变表情",
+      "default": "true",
+      "group": "行为",
+      "desc": "AI 在思考 / 跑工具 / 等你确认 / 上下文吃满时换对应表情并说一句"
+    },
+    {
+      "key": "pet_passthrough",
+      "type": "switch",
+      "title": "点击穿透（纯装饰）",
+      "default": "false",
+      "group": "行为",
+      "desc": "开着时点它会点到下面 App，你也摸不到它；想收回先到这里关掉"
+    }
+  ]
+}
