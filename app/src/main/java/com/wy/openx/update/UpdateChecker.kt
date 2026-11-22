@@ -143,6 +143,8 @@ object UpdateChecker {
         if (release.assetUrl.isBlank()) return@withContext null
         val dir = File(context.cacheDir, "update").apply { mkdirs() }
         val target = File(dir, release.assetName)
+        // 只保留本次要写的目标：同一次运行里先后试过不同版本时，旧包不会累积。
+        dir.listFiles()?.forEach { if (it.isFile && it.name != target.name) it.delete() }
         if (target.isFile && target.length() > 0) target.delete()
 
         val candidates = MIRROR_PREFIXES.map { it + release.assetUrl } + release.assetUrl
@@ -178,6 +180,20 @@ object UpdateChecker {
                 }
             }
             return target.length() > 0
+        }
+    }
+
+    /**
+     * 清理 `cacheDir/update/` 里残留的安装包（单个约 65MB）。
+     *
+     * 为什么不在安装后立刻删：安装器是异步读取 APK 的——拉起 Intent 后还要用户确认、
+     * 系统拷贝、签名校验，全程文件必须存在，提前删会让大包装到一半失败。
+     * 改在进程启动时清理：本应用被覆盖安装后进程必然重启，此刻残留的包要么已装完、
+     * 要么用户已放弃安装，都可以安全删除。
+     */
+    fun cleanDownloadedApks(context: Context) {
+        runCatching {
+            File(context.cacheDir, "update").listFiles()?.forEach { if (it.isFile) it.delete() }
         }
     }
 

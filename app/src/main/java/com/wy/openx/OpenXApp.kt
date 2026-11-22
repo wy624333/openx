@@ -33,6 +33,20 @@ class OpenXApp : Application() {
         purgeLegacyUiStatePrefs()
         installCrashHandler()
         restorePluginOverlays()
+        cleanUpdateCache()
+    }
+
+    /**
+     * 清理上次会话残留的更新安装包（`cacheDir/update/`，单个约 65MB）。
+     *
+     * 为什么只能在这里做：安装器是异步读取 APK 的，拉起 Intent 后不能立即删；
+     * 而本应用被覆盖安装后进程必然重启，此刻残留包已无用途。
+     * 放后台线程：清目录不在启动关键路径上，不值得占主线程。
+     */
+    private fun cleanUpdateCache() {
+        Thread({
+            runCatching { com.wy.openx.update.UpdateChecker.cleanDownloadedApks(this) }
+        }, "update-cache-cleanup").apply { isDaemon = true }.start()
     }
 
     /**
