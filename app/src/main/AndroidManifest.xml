@@ -27,8 +27,6 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- 语音播报/通话要切换音频路由与扬声器，并申请音频焦点 -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- 应用管理 -->
     <!-- 安装 APK：侧边栏文件树点安装包时交给系统安装器（见 FileOpenHelper）。
@@ -40,20 +38,6 @@
 
     <!-- 辅助功能 -->
     <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
-
-    <!-- 日历 -->
-    <uses-permission android:name="android.permission.READ_CALENDAR" />
-    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
-
-    <!-- 联系人 -->
-    <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
-
-    <!-- 电话 -->
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" android:maxSdkVersion="32" />
-
-    <!-- 短信 -->
-    <uses-permission android:name="android.permission.READ_SMS" android:maxSdkVersion="32" />
 
     <application
         android:name=".OpenXApp"

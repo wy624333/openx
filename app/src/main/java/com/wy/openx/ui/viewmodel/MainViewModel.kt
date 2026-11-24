@@ -6559,6 +6559,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 "cd /tmp && rm -rf node-dl && mkdir node-dl && cd node-dl && " +
                                     "curl -fsSL $nodeBinBase/v$v/node-v$v-linux-$arch.tar.xz -o node.tar.xz && " +
                                     "tar -xJf node.tar.xz && " +
+                                    // 先清掉旧 npm / corepack：`cp -rf` 是合并覆盖，不删旧文件，
+                                    // 旧版独有的文件会留在新版的扁平依赖里，出现两套版本同时生效
+                                    // （实测 minipass@7 配 minipass-pipeline@1.2.4，一 require 就
+                                    // Class extends ... is not a constructor，npm 整个装不了包）。
+                                    // 整个 node_modules 不能删：里面还躺着用户的 pnpm/opencode 等全局包。
+                                    "rm -rf /usr/lib/node_modules/npm /usr/lib/node_modules/corepack && " +
                                     "cp -rf node-v$v-linux-$arch/bin/* /usr/bin/ && " +
                                     "cp -rf node-v$v-linux-$arch/lib/* /usr/lib/ && " +
                                     "cd /tmp && rm -rf node-dl && hash -r",
@@ -6574,6 +6580,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             .trim().removePrefix("v").substringBefore('.').toIntOrNull()
                         return major != null && major >= 18
                     }
+                    // proot 容器里 npm 解不出「带大 native 二进制的平台包」：
+                    // opencode-linux-arm64（存在包里 212MB）、@pnpm/exe.linux-arm64（58MB）
+                    // 解包后留下的是指向不存在的 .l2s.* 的悬空软链，装完命令照旧 command not found。
+                    // 这是 npm 的 tar 解包与 proot link2symlink 扩展相互作用的结果，
+                    // npm 层（--force / --allow-scripts）都修不了，只能装完按包名单独拉 tgz
+                    // 解出真实二进制，覆盖那层固定名的中间软链（.l2s.* 是 proot 动态分配的，不能写死）。
+                    suspend fun repairNativeBinary(
+                        pkgName: String, verFrom: String, innerSrc: String, dest: String
+                    ): Boolean {
+                        val probe = "[ -x '$dest' ] && echo ok || true"
+                        if (containerEngine.runCommandSync(probe, null, 10_000).contains("ok")) return true
+                        val ver = containerEngine.runCommandSync(
+                            "node -p \"require('$verFrom/package.json').version\" 2>/dev/null", null, 10_000
+                        ).trim()
+                        if (ver.isEmpty()) return false
+                        val short = pkgName.substringAfterLast('/')
+                        containerEngine.runCommandSync(
+                            "cd /tmp && rm -rf nbfix && mkdir nbfix && cd nbfix && " +
+                                "curl -fsSL '$regUrl/$pkgName/-/$short-$ver.tgz' -o p.tgz && " +
+                                "tar -xzf p.tgz && rm -f '$dest' && cp -f '$innerSrc' '$dest' && " +
+                                "chmod +x '$dest' && cd /tmp && rm -rf nbfix",
+                            null, 900_000
+                        )
+                        return containerEngine.runCommandSync(probe, null, 10_000).contains("ok")
+                    }
                     when (key) {
                         "node", "npm", "corepack" -> installNode()
                         "pnpm" -> {
@@ -6585,12 +6616,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             containerEngine.runCommandSync(
                                 "npm install -g pnpm@latest --registry=$regUrl --force", null, 600_000
                             )
+                            // pnpm 12.x 自身只是个壳，真正的可执行文件在 @pnpm/exe.<platform> 里
+                            repairNativeBinary(
+                                "@pnpm/exe.linux-arm64",
+                                "/usr/lib/node_modules/pnpm/node_modules/@pnpm/exe.linux-arm64",
+                                "package/pnpm",
+                                "/usr/lib/node_modules/pnpm/pnpm"
+                            )
                         }
                         "opencode" -> {
                             if (!nodeUsable()) installNode()
                             // 旧版 opencode 已存在会报 File exists → --force 覆盖
                             containerEngine.runCommandSync(
                                 "npm install -g opencode-ai@latest --registry=$regUrl --force", null, 900_000
+                            )
+                            // opencode-ai 的 bin/opencode.exe 是软链，指向平台包里的二进制
+                            repairNativeBinary(
+                                "opencode-linux-arm64",
+                                "/usr/lib/node_modules/opencode-ai/node_modules/opencode-linux-arm64",
+                                "package/bin/opencode",
+                                "/usr/lib/node_modules/opencode-ai/bin/opencode.exe"
                             )
                         }
                         "dsh" -> {
