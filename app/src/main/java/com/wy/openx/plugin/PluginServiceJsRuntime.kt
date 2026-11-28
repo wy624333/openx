@@ -286,6 +286,17 @@ object PluginServiceJsRuntime {
             var parsed = (typeof infoJson === 'string') ? JSON.parse(infoJson) : infoJson;
             info = Array.isArray(parsed) ? (parsed[0] || {}) : (parsed || {});
         } catch (e) {}
+        // 每次定时任务开始前重读 env：面板（另一份 JS 运行时）会把请求写进
+        // env 文件，而 envStore 只在 onStart 时读过一次。不重读的话服务
+        // 永远看不到面板后来的写入（表现为「面板提交了任务，后台毫无反应」）。
+        try {
+            var envFresh = (typeof NativeInterface !== 'undefined' && NativeInterface.openxLoadEnv)
+                ? NativeInterface.openxLoadEnv() : null;
+            if (envFresh) {
+                var parsedEnv = JSON.parse(envFresh);
+                if (parsedEnv && typeof parsedEnv === 'object') envStore = parsedEnv;
+            }
+        } catch (e) {}
         var taskId = String(info.taskId || '');
         var fn = (typeof module !== 'undefined' && module.exports && module.exports.onSchedule)
             ? module.exports.onSchedule
